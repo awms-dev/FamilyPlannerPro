@@ -4,6 +4,11 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertActivitySchema, insertFamilySchema, insertFamilyMemberSchema } from "@shared/schema";
 import { z } from "zod";
+import { randomBytes } from "crypto";
+
+function generateInviteToken(): string {
+  return randomBytes(32).toString('hex');
+}
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -67,6 +72,15 @@ export function registerRoutes(app: Express): Server {
     const { familyId } = z.object({ familyId: z.coerce.number() }).parse(req.params);
     const parsed = insertFamilyMemberSchema.parse(req.body);
 
+    // Check if member already exists
+    const existingMembers = await storage.getFamilyMembers(familyId);
+    const memberExists = existingMembers.some(member => member.inviteEmail === parsed.inviteEmail);
+
+    if (memberExists) {
+      return res.status(400).json({ error: "Member already exists in this family" });
+    }
+
+    const inviteToken = generateInviteToken();
     const existingUser = await storage.getUserByEmail(parsed.inviteEmail);
 
     const member = await storage.inviteFamilyMember({
@@ -74,8 +88,19 @@ export function registerRoutes(app: Express): Server {
       familyId,
       userId: existingUser?.id,
       status: existingUser ? "active" : "pending",
+      inviteToken
     });
-    res.status(201).json(member);
+
+    // Generate invite URL
+    const appUrl = process.env.REPL_SLUG 
+      ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co` 
+      : 'http://localhost:3000';
+    const inviteUrl = `${appUrl}/auth?invite=${inviteToken}`;
+
+    res.status(201).json({ 
+      ...member,
+      inviteUrl 
+    });
   });
 
   // Activity routes
