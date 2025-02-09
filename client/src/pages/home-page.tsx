@@ -64,8 +64,11 @@ export default function HomePage() {
 
   const createFamilyMutation = useMutation({
     mutationFn: async (data: any) => {
+      console.log('Starting mutation with data:', data);
       const res = await apiRequest("POST", "/api/families", data);
-      return await res.json();
+      const result = await res.json();
+      console.log('Mutation completed with result:', result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/families"] });
@@ -74,17 +77,26 @@ export default function HomePage() {
         description: "Family created successfully",
       });
       familyForm.reset();
-      setCreateFamilyDialogOpen(false); // Close dialog on success
+      setCreateFamilyDialogOpen(false);
     },
     onError: (error: Error) => {
+      console.error('Mutation error:', error);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-      // Dialog stays open on error
     },
   });
+
+  const onCreateFamily = async (data: any) => {
+    console.log('Form submitted with data:', data);
+    try {
+      await createFamilyMutation.mutateAsync(data);
+    } catch (error) {
+      console.error('Form submission error:', error);
+    }
+  };
 
   const createActivityMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -169,27 +181,17 @@ export default function HomePage() {
                   <DialogHeader>
                     <DialogTitle>Create New Family</DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    const handleSubmit = async () => {
-                      try {
-                        await familyForm.handleSubmit((data) => {
-                          console.log('Submitting family data:', data);
-                          return createFamilyMutation.mutateAsync(data);
-                        })(e);
-                      } catch (error) {
-                        console.error('Form submission error:', error);
-                        // Keep dialog open on error
-                      }
-                    };
-                    handleSubmit();
-                  }}>
+                  <form onSubmit={familyForm.handleSubmit(onCreateFamily)}>
                     <div className="space-y-4">
                       <div>
                         <Label htmlFor="name">Family Name</Label>
                         <Input id="name" {...familyForm.register("name")} />
                       </div>
-                      <Button type="submit" className="w-full" disabled={createFamilyMutation.isPending}>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={createFamilyMutation.isPending}
+                      >
                         {createFamilyMutation.isPending ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
