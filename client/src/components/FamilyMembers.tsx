@@ -27,11 +27,11 @@ export function FamilyMembers({ familyId }: { familyId: number }) {
   });
 
   const inviteMutation = useMutation({
-    mutationFn: async (data: InsertFamilyMember) => {
+    mutationFn: async (data: { inviteEmail: string }) => {
       const res = await apiRequest(
         "POST",
         `/api/families/${familyId}/members`,
-        { ...data, role: "member" }
+        { ...data, role: "member" } as InsertFamilyMember
       );
       const result = await res.json();
       if (res.ok) {

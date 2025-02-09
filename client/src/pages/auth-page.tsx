@@ -7,23 +7,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema } from "@shared/schema";
-import { Redirect, useLocation } from "wouter";
+import { Redirect } from "wouter";
 import { FaUserFriends } from "react-icons/fa";
 import { useEffect, useState } from "react";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
-  const [, params] = useLocation();
   const [inviteToken, setInviteToken] = useState<string | null>(null);
 
   // Extract invite token from URL
   useEffect(() => {
-    const searchParams = new URLSearchParams(params);
+    const searchParams = new URLSearchParams(window.location.search);
     const token = searchParams.get('invite');
     if (token) {
       setInviteToken(token);
     }
-  }, [params]);
+  }, []);
 
   const loginForm = useForm({
     resolver: zodResolver(insertUserSchema.pick({ username: true, password: true })),
