@@ -28,6 +28,8 @@ export interface IStorage {
   getFamilyMembers(familyId: number): Promise<FamilyMember[]>;
   getFamilyMembersByEmail(email: string): Promise<FamilyMember[]>;
   updateFamilyMemberStatus(id: number, status: "pending" | "active"): Promise<FamilyMember>;
+  getFamilyMembersByInviteToken(token: string): Promise<FamilyMember[]>;
+  updateFamilyMember(id: number, updates: Partial<FamilyMember>): Promise<FamilyMember>;
 
   // Activity methods
   getActivities(familyId: number): Promise<Activity[]>;
@@ -159,6 +161,22 @@ export class DatabaseStorage implements IStorage {
     }
 
     return activity;
+  }
+
+  async getFamilyMembersByInviteToken(token: string): Promise<FamilyMember[]> {
+    return db
+      .select()
+      .from(familyMembers)
+      .where(eq(familyMembers.inviteToken, token));
+  }
+
+  async updateFamilyMember(id: number, updates: Partial<FamilyMember>): Promise<FamilyMember> {
+    const [member] = await db
+      .update(familyMembers)
+      .set(updates)
+      .where(eq(familyMembers.id, id))
+      .returning();
+    return member;
   }
 }
 

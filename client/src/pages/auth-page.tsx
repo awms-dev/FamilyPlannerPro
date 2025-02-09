@@ -10,17 +10,35 @@ import { insertUserSchema } from "@shared/schema";
 import { Redirect } from "wouter";
 import { FaUserFriends } from "react-icons/fa";
 import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  // Extract invite token from URL
+  // Extract invite token from URL and verify it
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const token = searchParams.get('invite');
     if (token) {
       setInviteToken(token);
+      // Verify the invite token
+      apiRequest("GET", `/api/invites/${token}`)
+        .then(res => {
+          if (!res.ok) {
+            throw new Error("Invalid invitation link");
+          }
+        })
+        .catch(error => {
+          toast({
+            title: "Invalid Invitation",
+            description: "The invitation link you're using is invalid or has expired.",
+            variant: "destructive",
+          });
+          setInviteToken(null);
+        });
     }
   }, []);
 
@@ -42,7 +60,32 @@ export default function AuthPage() {
     },
   });
 
-  if (user) {
+  // After successful registration with invite token, join the family
+  useEffect(() => {
+    if (user && inviteToken) {
+      apiRequest("POST", `/api/invites/${inviteToken}/accept`)
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to join family");
+          return res.json();
+        })
+        .then(() => {
+          toast({
+            title: "Welcome!",
+            description: "You've successfully joined the family.",
+          });
+          window.location.href = "/"; // Redirect to home page
+        })
+        .catch(error => {
+          toast({
+            title: "Error",
+            description: "Failed to join the family. Please try again.",
+            variant: "destructive",
+          });
+        });
+    }
+  }, [user, inviteToken]);
+
+  if (user && !inviteToken) {
     return <Redirect to="/" />;
   }
 

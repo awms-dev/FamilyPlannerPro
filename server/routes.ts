@@ -92,16 +92,68 @@ export function registerRoutes(app: Express): Server {
     });
 
     // Generate invite URL
-    const appUrl = process.env.REPL_SLUG 
-      ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co` 
+    const appUrl = process.env.REPL_SLUG
+      ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
       : 'http://localhost:3000';
     const inviteUrl = `${appUrl}/auth?invite=${inviteToken}`;
 
-    res.status(201).json({ 
+    res.status(201).json({
       ...member,
-      inviteUrl 
+      inviteUrl
     });
   });
+
+  // Add this route before the activities routes
+  app.get("/api/invites/:token", async (req, res) => {
+    const { token } = req.params;
+    try {
+      const members = await storage.getFamilyMembersByInviteToken(token);
+      if (!members || members.length === 0) {
+        return res.status(404).json({ error: "Invalid or expired invite token" });
+      }
+      const member = members[0];
+
+      // If the member is already active, return an error
+      if (member.status === "active") {
+        return res.status(400).json({ error: "This invitation has already been used" });
+      }
+
+      res.json({ familyId: member.familyId });
+    } catch (error) {
+      console.error("Error verifying invite:", error);
+      res.status(500).json({ error: "Failed to verify invite" });
+    }
+  });
+
+  // Add this route to handle post-registration family joining
+  app.post("/api/invites/:token/accept", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    const { token } = req.params;
+    try {
+      const members = await storage.getFamilyMembersByInviteToken(token);
+      if (!members || members.length === 0) {
+        return res.status(404).json({ error: "Invalid or expired invite token" });
+      }
+
+      const member = members[0];
+      if (member.status === "active") {
+        return res.status(400).json({ error: "This invitation has already been used" });
+      }
+
+      // Update the member record with the user's ID and mark as active
+      const updatedMember = await storage.updateFamilyMember(member.id, {
+        userId: req.user.id,
+        status: "active"
+      });
+
+      res.json(updatedMember);
+    } catch (error) {
+      console.error("Error accepting invite:", error);
+      res.status(500).json({ error: "Failed to accept invitation" });
+    }
+  });
+
 
   // Activity routes
   app.get("/api/activities", async (req, res) => {
