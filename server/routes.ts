@@ -13,7 +13,16 @@ function generateInviteToken(): string {
 function constructAppUrl(req: Express.Request): string {
   const protocol = req.headers['x-forwarded-proto'] || 'http';
   const host = req.headers.host || req.hostname;
-  return `${protocol}://${host}`;
+  const baseUrl = `${protocol}://${host}`;
+  // Remove any trailing slashes
+  return baseUrl.replace(/\/+$/, '');
+}
+
+function joinPaths(...paths: string[]): string {
+  return paths
+    .map(path => path.replace(/^\/+|\/+$/g, '')) // Remove leading/trailing slashes
+    .filter(Boolean) // Remove empty segments
+    .join('/');
 }
 
 export function registerRoutes(app: Express): Server {
@@ -102,7 +111,7 @@ export function registerRoutes(app: Express): Server {
         status: existingUser ? "active" : "pending",
       });
 
-      // Construct invite URL without double slashes
+      // Construct invite URL properly
       const baseUrl = constructAppUrl(req);
       const inviteUrl = `${baseUrl}/auth?invite=${inviteToken}`;
 

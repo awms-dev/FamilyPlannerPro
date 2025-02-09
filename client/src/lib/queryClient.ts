@@ -10,14 +10,14 @@ async function throwIfResNotOk(res: Response) {
 // Use relative URLs in development
 const BASE_URL = '';
 
-console.log('Using relative API URLs');
-
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const requestUrl = `${BASE_URL}${url}`;
+  // Ensure URL starts with a single forward slash
+  const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+  const requestUrl = `${BASE_URL}${cleanUrl}`;
   console.log(`Making ${method} request to:`, requestUrl);
 
   const res = await fetch(requestUrl, {
@@ -40,7 +40,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const requestUrl = `${BASE_URL}${queryKey[0]}`;
+    // Ensure URL starts with a single forward slash
+    const urlPath = typeof queryKey[0] === 'string' ? queryKey[0] : '';
+    const cleanUrl = urlPath.startsWith('/') ? urlPath : `/${urlPath}`;
+    const requestUrl = `${BASE_URL}${cleanUrl}`;
     console.log('Making query request to:', requestUrl);
 
     const res = await fetch(requestUrl, {
