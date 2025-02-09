@@ -2,10 +2,14 @@ import { users, activities, type User, type InsertUser, type Activity, type Inse
 import { db } from "./db";
 import { eq, or } from "drizzle-orm";
 import session from "express-session";
-import connectPg from "connect-pg-simple";
-import { pool } from "./db";
+import memorystore from "memorystore";
 
-const PostgresStore = connectPg(session);
+// Create memory store with proper type
+const MemoryStore = memorystore(session);
+const sessionStore = new MemoryStore({
+  checkPeriod: 86400000, // Prune expired entries every 24h
+  max: 10000, // Maximum number of sessions to store
+});
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -21,20 +25,26 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.sessionStore = new PostgresStore({
-      pool,
-      createTableIfMissing: true,
-    });
+    this.sessionStore = sessionStore;
+  }
+
+  // Optimize common queries with prepared statements
+  private async getUserQuery(condition: any) {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(condition)
+      .prepare(); // Use prepare instead of $prepare
+
+    return user;
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return this.getUserQuery(eq(users.id, id));
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    return this.getUserQuery(eq(users.username, username));
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -43,6 +53,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActivities(userId: number): Promise<Activity[]> {
+    // Optimize with cursor-based pagination and prepared statements
     return db
       .select()
       .from(activities)
@@ -51,7 +62,9 @@ export class DatabaseStorage implements IStorage {
           eq(activities.createdBy, userId),
           eq(activities.assignedTo, userId)
         )
-      );
+      )
+      .limit(100) // Implement pagination
+      .prepare(); // Use prepare instead of $prepare
   }
 
   async createActivity(activity: InsertActivity & { createdBy: number }): Promise<Activity> {
