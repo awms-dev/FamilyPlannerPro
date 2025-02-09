@@ -21,7 +21,10 @@ import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { CalendarIcon, Plus, CheckCircle } from "lucide-react";
+import { CalendarIcon, Plus, CheckCircle, CalendarDays } from "lucide-react";
+import { Link } from "wouter";
+import { Switch } from "@/components/ui/switch";
+
 
 const categories = [
   "Groceries",
@@ -63,7 +66,20 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Family Activities</h1>
+          <div className="flex items-center gap-6">
+            <h1 className="text-2xl font-bold">Family Activities</h1>
+            <nav className="flex gap-4">
+              <Link href="/" className="text-muted-foreground hover:text-foreground">
+                Activities
+              </Link>
+              <Link href="/calendar" className="text-muted-foreground hover:text-foreground">
+                <span className="flex items-center gap-1">
+                  <CalendarDays className="h-4 w-4" />
+                  Calendar
+                </span>
+              </Link>
+            </nav>
+          </div>
           <div className="flex items-center gap-4">
             <span className="text-muted-foreground">Welcome, {user?.displayName}</span>
             <Button variant="outline" onClick={() => logoutMutation.mutate()}>
@@ -113,28 +129,59 @@ export default function HomePage() {
                     </Select>
                   </div>
                   <div>
-                    <Label>Due Date</Label>
+                    <Label>Start Date</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
                           className={cn(
                             "w-full justify-start text-left font-normal",
-                            !form.watch("dueDate") && "text-muted-foreground"
+                            !form.watch("startDate") && "text-muted-foreground"
                           )}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.watch("dueDate") ? format(form.watch("dueDate"), "PPP") : <span>Pick a date</span>}
+                          {form.watch("startDate") ? format(form.watch("startDate"), "PPP") : <span>Pick a date</span>}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0">
                         <Calendar
                           mode="single"
-                          selected={form.watch("dueDate")}
-                          onSelect={(date) => form.setValue("dueDate", date)}
+                          selected={form.watch("startDate")}
+                          onSelect={(date) => form.setValue("startDate", date)}
                         />
                       </PopoverContent>
                     </Popover>
+                  </div>
+                  <div>
+                    <Label>End Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !form.watch("endDate") && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {form.watch("endDate") ? format(form.watch("endDate"), "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={form.watch("endDate")}
+                          onSelect={(date) => form.setValue("endDate", date)}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div>
+                    <Label>All Day Event</Label>
+                    <Switch 
+                      checked={form.watch("isAllDay")}
+                      onCheckedChange={(checked) => form.setValue("isAllDay", checked)}
+                    />
                   </div>
                   <div>
                     <Label>Assign To</Label>
