@@ -164,6 +164,14 @@ export default function HomePage() {
     },
   });
 
+  const onCreateFamily = async (data: any) => {
+    try {
+      await createFamilyMutation.mutateAsync(data);
+    } catch (error) {
+      console.error('Form submission error:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
@@ -317,8 +325,8 @@ export default function HomePage() {
                                 )}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {activityForm.watch("startDate") ? 
-                                  format(activityForm.watch("startDate"), "PPP") : 
+                                {activityForm.watch("startDate") ?
+                                  format(activityForm.watch("startDate"), "PPP") :
                                   <span>Pick a date</span>
                                 }
                               </Button>
@@ -355,8 +363,8 @@ export default function HomePage() {
                                 )}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {activityForm.watch("endDate") ? 
-                                  format(activityForm.watch("endDate"), "PPP") : 
+                                {activityForm.watch("endDate") ?
+                                  format(activityForm.watch("endDate"), "PPP") :
                                   <span>Pick a date</span>
                                 }
                               </Button>
@@ -391,7 +399,7 @@ export default function HomePage() {
 
                         <div>
                           <Label>Assign To</Label>
-                          <Select 
+                          <Select
                             onValueChange={(value) => activityForm.setValue("assignedTo", parseInt(value))}
                           >
                             <SelectTrigger>
@@ -403,9 +411,9 @@ export default function HomePage() {
                           </Select>
                         </div>
 
-                        <Button 
-                          type="submit" 
-                          className="w-full" 
+                        <Button
+                          type="submit"
+                          className="w-full"
                           disabled={createActivityMutation.isPending}
                         >
                           {createActivityMutation.isPending ? (
