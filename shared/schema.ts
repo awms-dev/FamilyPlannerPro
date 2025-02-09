@@ -28,26 +28,23 @@ export const insertUserSchema = createInsertSchema(users).pick({
   displayName: true,
 });
 
+// Custom validation for dates
+const dateSchema = z.preprocess((arg) => {
+  if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+  return arg;
+}, z.date());
+
 export const insertActivitySchema = createInsertSchema(activities)
   .pick({
     title: true,
     description: true,
     category: true,
-    startDate: true,
-    endDate: true,
     assignedTo: true,
     isAllDay: true,
   })
-  .transform((data) => {
-    // Ensure dates are properly transformed to Date objects
-    const startDate = data.startDate instanceof Date ? data.startDate : new Date(data.startDate);
-    const endDate = data.endDate ? (data.endDate instanceof Date ? data.endDate : new Date(data.endDate)) : undefined;
-
-    return {
-      ...data,
-      startDate,
-      endDate,
-    };
+  .extend({
+    startDate: dateSchema,
+    endDate: dateSchema.nullable().optional(),
   });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

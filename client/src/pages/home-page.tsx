@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { CalendarIcon, Plus, CheckCircle, CalendarDays } from "lucide-react";
 import { Link } from "wouter";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 
 const categories = [
   "Groceries",
@@ -35,6 +36,7 @@ const categories = [
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
+  const { toast } = useToast();
   const form = useForm({
     resolver: zodResolver(insertActivitySchema),
     defaultValues: {
@@ -48,10 +50,31 @@ export default function HomePage() {
 
   const createActivityMutation = useMutation({
     mutationFn: async (data: any) => {
-      await apiRequest("POST", "/api/activities", data);
+      try {
+        // Form data already includes proper Date objects from the calendar
+        await apiRequest("POST", "/api/activities", {
+          ...data,
+          assignedTo: Number(data.assignedTo), // Ensure assignedTo is a number
+        });
+      } catch (error) {
+        console.error("Failed to create activity:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      toast({
+        title: "Success",
+        description: "Activity created successfully",
+      });
+      form.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -142,13 +165,13 @@ export default function HomePage() {
                           )}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.watch("startDate") ? format(new Date(form.watch("startDate")), "PPP") : <span>Pick a date</span>}
+                          {form.watch("startDate") ? format(form.watch("startDate"), "PPP") : <span>Pick a date</span>}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
-                          selected={form.watch("startDate") ? new Date(form.watch("startDate")) : undefined}
+                          selected={form.watch("startDate")}
                           onSelect={(date) => form.setValue("startDate", date)}
                           initialFocus
                         />
@@ -167,13 +190,13 @@ export default function HomePage() {
                           )}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.watch("endDate") ? format(new Date(form.watch("endDate")), "PPP") : <span>Pick a date</span>}
+                          {form.watch("endDate") ? format(form.watch("endDate"), "PPP") : <span>Pick a date</span>}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
-                          selected={form.watch("endDate") ? new Date(form.watch("endDate")) : undefined}
+                          selected={form.watch("endDate")}
                           onSelect={(date) => form.setValue("endDate", date)}
                           initialFocus
                         />
@@ -182,7 +205,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Label>All Day Event</Label>
-                    <Switch 
+                    <Switch
                       checked={form.watch("isAllDay")}
                       onCheckedChange={(checked) => form.setValue("isAllDay", checked)}
                     />
