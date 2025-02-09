@@ -22,6 +22,15 @@ export function registerRoutes(app: Express): Server {
         createdBy: req.user.id,
       });
 
+      // Create initial family member record for the creator
+      await storage.inviteFamilyMember({
+        familyId: family.id,
+        userId: req.user.id,
+        role: "admin",
+        status: "active",
+        inviteEmail: req.user.email // Use the creator's email
+      });
+
       console.log('POST /api/families - Created family:', family);
       res.status(201).json(family);
     } catch (error) {
