@@ -15,9 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod"; // Add zod import
 import { insertActivitySchema, insertFamilySchema, type Activity, type Family } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { format } from "date-fns";
+import { format, set } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -36,14 +37,26 @@ const categories = [
   "Other"
 ];
 
+// Add activity form schema
+const activityFormSchema = insertActivitySchema.extend({
+  startTime: z.string(),
+  endTime: z.string().optional(),
+});
+
+type ActivityFormData = z.infer<typeof activityFormSchema>;
+
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [createFamilyDialogOpen, setCreateFamilyDialogOpen] = useState(false);
-  const activityForm = useForm({
-    resolver: zodResolver(insertActivitySchema),
+  const [createActivityDialogOpen, setCreateActivityDialogOpen] = useState(false);
+
+  const activityForm = useForm<ActivityFormData>({
+    resolver: zodResolver(activityFormSchema),
     defaultValues: {
       isAllDay: false,
+      startTime: "09:00",
+      endTime: "10:00",
     },
   });
 
@@ -57,25 +70,21 @@ export default function HomePage() {
     queryKey: ["/api/families"],
   });
 
-  const { data: activities = [], onError: activitiesOnError } = useQuery<Activity[]>({
+  const { data: activities = [] } = useQuery<Activity[]>({
     queryKey: ["/api/activities", { familyId: selectedFamilyId }],
+    queryFn: async () => {
+      if (!selectedFamilyId) return [];
+      const response = await fetch(`/api/activities?familyId=${selectedFamilyId}`);
+      if (!response.ok) throw new Error('Failed to fetch activities');
+      return response.json();
+    },
     enabled: !!selectedFamilyId,
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to load activities",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
   });
 
   const createFamilyMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log('Starting mutation with data:', data);
       const res = await apiRequest("POST", "/api/families", data);
-      const result = await res.json();
-      console.log('Mutation completed with result:', result);
-      return result;
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/families"] });
@@ -87,7 +96,6 @@ export default function HomePage() {
       setCreateFamilyDialogOpen(false);
     },
     onError: (error: Error) => {
-      console.error('Mutation error:', error);
       toast({
         title: "Error",
         description: error.message,
@@ -96,27 +104,38 @@ export default function HomePage() {
     },
   });
 
-  const onCreateFamily = async (data: any) => {
-    console.log('Form submitted with data:', data);
-    try {
-      await createFamilyMutation.mutateAsync(data);
-    } catch (error) {
-      console.error('Form submission error:', error);
-    }
-  };
-
   const createActivityMutation = useMutation({
-    mutationFn: async (data: any) => {
-      try {
-        await apiRequest("POST", "/api/activities", {
-          ...data,
-          familyId: selectedFamilyId,
-          assignedTo: Number(data.assignedTo),
+    mutationFn: async (data: ActivityFormData) => {
+      if (!selectedFamilyId) throw new Error("No family selected");
+
+      // Combine date and time
+      const startDate = data.startDate;
+      const endDate = data.endDate;
+
+      if (!startDate) throw new Error("Start date is required");
+
+      const startDateTime = set(startDate, {
+        hours: parseInt(data.startTime.split(':')[0]),
+        minutes: parseInt(data.startTime.split(':')[1]),
+      });
+
+      let endDateTime = undefined;
+      if (endDate && data.endTime) {
+        endDateTime = set(endDate, {
+          hours: parseInt(data.endTime.split(':')[0]),
+          minutes: parseInt(data.endTime.split(':')[1]),
         });
-      } catch (error) {
-        console.error("Failed to create activity:", error);
-        throw error;
       }
+
+      const activityData = {
+        ...data,
+        familyId: selectedFamilyId,
+        startDate: startDateTime,
+        endDate: endDateTime,
+        assignedTo: Number(data.assignedTo),
+      };
+
+      await apiRequest("POST", "/api/activities", activityData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/activities", { familyId: selectedFamilyId }] });
@@ -125,6 +144,7 @@ export default function HomePage() {
         description: "Activity created successfully",
       });
       activityForm.reset();
+      setCreateActivityDialogOpen(false);
     },
     onError: (error: Error) => {
       toast({
@@ -173,7 +193,6 @@ export default function HomePage() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="grid gap-8">
-          {/* Family Section */}
           <section>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">My Families</h2>
@@ -240,12 +259,11 @@ export default function HomePage() {
             )}
           </section>
 
-          {/* Activities Section */}
           {selectedFamilyId && (
             <section>
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-xl font-semibold">Activities</h2>
-                <Dialog>
+                <Dialog open={createActivityDialogOpen} onOpenChange={setCreateActivityDialogOpen}>
                   <DialogTrigger asChild>
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
@@ -261,11 +279,16 @@ export default function HomePage() {
                         <div>
                           <Label htmlFor="title">Title</Label>
                           <Input id="title" {...activityForm.register("title")} />
+                          {activityForm.formState.errors.title && (
+                            <p className="text-sm text-destructive">{activityForm.formState.errors.title.message}</p>
+                          )}
                         </div>
+
                         <div>
                           <Label htmlFor="description">Description</Label>
                           <Textarea id="description" {...activityForm.register("description")} />
                         </div>
+
                         <div>
                           <Label>Category</Label>
                           <Select onValueChange={(value) => activityForm.setValue("category", value)}>
@@ -281,6 +304,7 @@ export default function HomePage() {
                             </SelectContent>
                           </Select>
                         </div>
+
                         <div>
                           <Label>Start Date</Label>
                           <Popover>
@@ -293,7 +317,10 @@ export default function HomePage() {
                                 )}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {activityForm.watch("startDate") ? format(activityForm.watch("startDate"), "PPP") : <span>Pick a date</span>}
+                                {activityForm.watch("startDate") ? 
+                                  format(activityForm.watch("startDate"), "PPP") : 
+                                  <span>Pick a date</span>
+                                }
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
@@ -306,6 +333,16 @@ export default function HomePage() {
                             </PopoverContent>
                           </Popover>
                         </div>
+
+                        <div>
+                          <Label htmlFor="startTime">Start Time</Label>
+                          <Input
+                            id="startTime"
+                            type="time"
+                            {...activityForm.register("startTime")}
+                          />
+                        </div>
+
                         <div>
                           <Label>End Date</Label>
                           <Popover>
@@ -318,7 +355,10 @@ export default function HomePage() {
                                 )}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {activityForm.watch("endDate") ? format(activityForm.watch("endDate"), "PPP") : <span>Pick a date</span>}
+                                {activityForm.watch("endDate") ? 
+                                  format(activityForm.watch("endDate"), "PPP") : 
+                                  <span>Pick a date</span>
+                                }
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
@@ -331,16 +371,29 @@ export default function HomePage() {
                             </PopoverContent>
                           </Popover>
                         </div>
+
+                        <div>
+                          <Label htmlFor="endTime">End Time</Label>
+                          <Input
+                            id="endTime"
+                            type="time"
+                            {...activityForm.register("endTime")}
+                          />
+                        </div>
+
                         <div className="flex items-center gap-2">
-                          <Label>All Day Event</Label>
                           <Switch
                             checked={activityForm.watch("isAllDay")}
                             onCheckedChange={(checked) => activityForm.setValue("isAllDay", checked)}
                           />
+                          <Label>All Day Event</Label>
                         </div>
+
                         <div>
                           <Label>Assign To</Label>
-                          <Select onValueChange={(value) => activityForm.setValue("assignedTo", parseInt(value))}>
+                          <Select 
+                            onValueChange={(value) => activityForm.setValue("assignedTo", parseInt(value))}
+                          >
                             <SelectTrigger>
                               <SelectValue placeholder="Select family member" />
                             </SelectTrigger>
@@ -349,8 +402,20 @@ export default function HomePage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <Button type="submit" className="w-full" disabled={createActivityMutation.isPending}>
-                          Create Activity
+
+                        <Button 
+                          type="submit" 
+                          className="w-full" 
+                          disabled={createActivityMutation.isPending}
+                        >
+                          {createActivityMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Creating...
+                            </>
+                          ) : (
+                            "Create Activity"
+                          )}
                         </Button>
                       </div>
                     </form>
