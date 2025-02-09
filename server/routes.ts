@@ -81,9 +81,28 @@ export function registerRoutes(app: Express): Server {
   // Activity routes
   app.get("/api/activities", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const { familyId } = z.object({ familyId: z.coerce.number() }).parse(req.query);
-    const activities = await storage.getActivities(familyId);
-    res.json(activities);
+
+    try {
+      const { familyId } = z.object({ familyId: z.coerce.number() }).parse(req.query);
+
+      // Check if user is a member of this family
+      const members = await storage.getFamilyMembers(familyId);
+      const userIsMember = members.some(member => member.userId === req.user?.id);
+
+      if (!userIsMember) {
+        return res.status(403).json({ error: "User is not a member of this family" });
+      }
+
+      const activities = await storage.getActivities(familyId);
+      res.json(activities);
+    } catch (error) {
+      console.error('GET /api/activities - Error:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(400).json({ error: 'An unknown error occurred' });
+      }
+    }
   });
 
   app.post("/api/activities", async (req, res) => {

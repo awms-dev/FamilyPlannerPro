@@ -57,9 +57,16 @@ export default function HomePage() {
     queryKey: ["/api/families"],
   });
 
-  const { data: activities = [] } = useQuery<Activity[]>({
+  const { data: activities = [], onError: activitiesOnError } = useQuery<Activity[]>({
     queryKey: ["/api/activities", { familyId: selectedFamilyId }],
     enabled: !!selectedFamilyId,
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to load activities",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   });
 
   const createFamilyMutation = useMutation({
