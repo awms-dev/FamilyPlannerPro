@@ -12,8 +12,13 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/families", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
-    console.log('POST /api/families - Request body:', req.body);
     try {
+      // Ensure user has an email
+      if (!req.user?.email) {
+        throw new Error("User email is required");
+      }
+
+      console.log('POST /api/families - Request body:', req.body);
       const parsed = insertFamilySchema.parse(req.body);
       console.log('POST /api/families - Parsed data:', parsed);
 
@@ -28,14 +33,18 @@ export function registerRoutes(app: Express): Server {
         userId: req.user.id,
         role: "admin",
         status: "active",
-        inviteEmail: req.user.email // Use the creator's email
+        inviteEmail: req.user.email // Explicitly set the inviteEmail
       });
 
       console.log('POST /api/families - Created family:', family);
       res.status(201).json(family);
     } catch (error) {
       console.error('POST /api/families - Error:', error);
-      res.status(400).json({ error: error.message });
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(400).json({ error: 'An unknown error occurred' });
+      }
     }
   });
 
