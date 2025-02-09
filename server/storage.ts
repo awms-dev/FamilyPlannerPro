@@ -1,6 +1,6 @@
-import { users, activities, type User, type InsertUser, type Activity, type InsertActivity } from "@shared/schema";
+import { users, activities, families, familyMembers, type User, type InsertUser, type Activity, type InsertActivity, type Family, type InsertFamily, type FamilyMember, type InsertFamilyMember } from "@shared/schema";
 import { db } from "./db";
-import { eq, or } from "drizzle-orm";
+import { eq, or, and } from "drizzle-orm";
 import session from "express-session";
 import memorystore from "memorystore";
 
@@ -14,10 +14,25 @@ const sessionStore = new MemoryStore({
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getActivities(userId: number): Promise<Activity[]>;
+
+  // Family related methods
+  createFamily(family: InsertFamily & { createdBy: number }): Promise<Family>;
+  getFamilyById(id: number): Promise<Family | undefined>;
+  getFamiliesByUserId(userId: number): Promise<Family[]>;
+
+  // Family member related methods
+  inviteFamilyMember(member: InsertFamilyMember & { familyId: number }): Promise<FamilyMember>;
+  getFamilyMembers(familyId: number): Promise<FamilyMember[]>;
+  getFamilyMembersByEmail(email: string): Promise<FamilyMember[]>;
+  updateFamilyMemberStatus(id: number, status: string): Promise<FamilyMember>;
+
+  // Updated activity methods to include family context
+  getActivities(familyId: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity & { createdBy: number }): Promise<Activity>;
   completeActivity(id: number): Promise<Activity>;
+
   sessionStore: session.Store;
 }
 
@@ -44,22 +59,95 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+    return result[0];
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
-  async getActivities(userId: number): Promise<Activity[]> {
+  async createFamily(family: InsertFamily & { createdBy: number }): Promise<Family> {
+    const [newFamily] = await db.insert(families).values(family).returning();
+
+    // Make the creator an admin member
+    const user = await this.getUser(family.createdBy);
+    await this.inviteFamilyMember({
+      familyId: newFamily.id,
+      inviteEmail: user!.email,
+      role: "admin",
+      userId: user!.id,
+      status: "active"
+    });
+
+    return newFamily;
+  }
+
+  async getFamilyById(id: number): Promise<Family | undefined> {
+    const result = await db
+      .select()
+      .from(families)
+      .where(eq(families.id, id));
+    return result[0];
+  }
+
+  async getFamiliesByUserId(userId: number): Promise<Family[]> {
+    const members = await db
+      .select({
+        familyId: familyMembers.familyId,
+      })
+      .from(familyMembers)
+      .where(eq(familyMembers.userId, userId));
+
+    const familyIds = members.map(m => m.familyId);
+
+    if (familyIds.length === 0) return [];
+
+    return db
+      .select()
+      .from(families)
+      .where(or(...familyIds.map(id => eq(families.id, id))));
+  }
+
+  async inviteFamilyMember(member: InsertFamilyMember & { familyId: number, userId?: number }): Promise<FamilyMember> {
+    const [newMember] = await db.insert(familyMembers).values(member).returning();
+    return newMember;
+  }
+
+  async getFamilyMembers(familyId: number): Promise<FamilyMember[]> {
+    return db
+      .select()
+      .from(familyMembers)
+      .where(eq(familyMembers.familyId, familyId));
+  }
+
+  async getFamilyMembersByEmail(email: string): Promise<FamilyMember[]> {
+    return db
+      .select()
+      .from(familyMembers)
+      .where(eq(familyMembers.inviteEmail, email));
+  }
+
+  async updateFamilyMemberStatus(id: number, status: string): Promise<FamilyMember> {
+    const [member] = await db
+      .update(familyMembers)
+      .set({ status })
+      .where(eq(familyMembers.id, id))
+      .returning();
+    return member;
+  }
+
+  async getActivities(familyId: number): Promise<Activity[]> {
     return db
       .select()
       .from(activities)
-      .where(
-        or(
-          eq(activities.createdBy, userId),
-          eq(activities.assignedTo, userId)
-        )
-      )
-      .limit(100); // Implement pagination for cost efficiency
+      .where(eq(activities.familyId, familyId))
+      .limit(100);
   }
 
   async createActivity(activity: InsertActivity & { createdBy: number }): Promise<Activity> {
