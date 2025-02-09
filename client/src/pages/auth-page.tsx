@@ -15,10 +15,20 @@ export default function AuthPage() {
 
   const loginForm = useForm({
     resolver: zodResolver(insertUserSchema.pick({ username: true, password: true })),
+    defaultValues: {
+      username: "",
+      password: "",
+    },
   });
 
   const registerForm = useForm({
     resolver: zodResolver(insertUserSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+      displayName: "",
+      email: "",
+    },
   });
 
   if (user) {
@@ -60,6 +70,10 @@ export default function AuthPage() {
                     <div>
                       <Label htmlFor="register-username">Username</Label>
                       <Input id="register-username" {...registerForm.register("username")} />
+                    </div>
+                    <div>
+                      <Label htmlFor="register-email">Email</Label>
+                      <Input id="register-email" type="email" {...registerForm.register("email")} />
                     </div>
                     <div>
                       <Label htmlFor="register-display-name">Display Name</Label>
