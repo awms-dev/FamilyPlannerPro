@@ -23,7 +23,7 @@ export const familyMembers = pgTable("family_members", {
   role: text("role").notNull(), // "admin", "member"
   status: text("status").notNull(), // "pending", "active"
   inviteEmail: text("invite_email").notNull(),
-  inviteToken: text("invite_token"), // New field for invite tokens
+  inviteToken: text("invite_token"), // For invite system
 });
 
 export const activities = pgTable("activities", {
@@ -57,6 +57,7 @@ export const insertFamilySchema = createInsertSchema(families).pick({
 export const insertFamilyMemberSchema = createInsertSchema(familyMembers)
   .pick({
     inviteEmail: true,
+    inviteToken: true,
   })
   .extend({
     role: z.enum(["admin", "member"]),

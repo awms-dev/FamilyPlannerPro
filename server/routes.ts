@@ -70,7 +70,7 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/families/:familyId/members", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const { familyId } = z.object({ familyId: z.coerce.number() }).parse(req.params);
-    const parsed = insertFamilyMemberSchema.parse(req.body);
+    const parsed = insertFamilyMemberSchema.omit({ inviteToken: true }).parse(req.body);
 
     // Check if member already exists
     const existingMembers = await storage.getFamilyMembers(familyId);
@@ -85,10 +85,10 @@ export function registerRoutes(app: Express): Server {
 
     const member = await storage.inviteFamilyMember({
       ...parsed,
+      inviteToken,
       familyId,
       userId: existingUser?.id,
       status: existingUser ? "active" : "pending",
-      inviteToken
     });
 
     // Generate invite URL
