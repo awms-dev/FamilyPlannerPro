@@ -21,7 +21,7 @@ import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { CalendarIcon, Plus, CheckCircle, CalendarDays, Users } from "lucide-react";
+import { CalendarIcon, Plus, CheckCircle, CalendarDays, Users, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -169,14 +169,26 @@ export default function HomePage() {
                   <DialogHeader>
                     <DialogTitle>Create New Family</DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={familyForm.handleSubmit((data) => createFamilyMutation.mutate(data))}>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    familyForm.handleSubmit((data) => {
+                      createFamilyMutation.mutate(data);
+                    })(e);
+                  }}>
                     <div className="space-y-4">
                       <div>
                         <Label htmlFor="name">Family Name</Label>
                         <Input id="name" {...familyForm.register("name")} />
                       </div>
                       <Button type="submit" className="w-full" disabled={createFamilyMutation.isPending}>
-                        {createFamilyMutation.isPending ? "Creating..." : "Create Family"}
+                        {createFamilyMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create Family"
+                        )}
                       </Button>
                     </div>
                   </form>
