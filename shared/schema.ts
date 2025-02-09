@@ -19,7 +19,7 @@ export const families = pgTable("families", {
 export const familyMembers = pgTable("family_members", {
   id: serial("id").primaryKey(),
   familyId: integer("family_id").notNull().references(() => families.id),
-  userId: integer("user_id").references(() => users.id),
+  userId: integer("user_id").references(() => users.id), // Made nullable by removing .notNull()
   role: text("role").notNull(), // "admin", "member"
   status: text("status").notNull(), // "pending", "active"
   inviteEmail: text("invite_email").notNull(),
