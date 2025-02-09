@@ -20,6 +20,8 @@ const corsOptions = {
     if (
       origin.endsWith('.repl.co') || 
       origin.endsWith('.replit.dev') ||
+      origin.includes('.repl.co') ||
+      origin.includes('.replit.dev') ||
       origin.startsWith('http://localhost:') ||
       origin.startsWith('http://127.0.0.1:')
     ) {

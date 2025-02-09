@@ -7,10 +7,8 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// Get the base URL from the current origin, but handle development environment
-const BASE_URL = import.meta.env.DEV 
-  ? `${window.location.protocol}//${window.location.hostname}:5000`
-  : window.location.origin;
+// Use current origin for API calls to ensure it works with any Replit domain
+const BASE_URL = window.location.origin;
 
 export async function apiRequest(
   method: string,
