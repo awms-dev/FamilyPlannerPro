@@ -6,6 +6,13 @@ import cors from "cors";
 
 const app = express();
 
+// Logging middleware for all requests
+app.use((req, res, next) => {
+  log(`${req.method} ${req.url}`);
+  log('Headers:', JSON.stringify(req.headers, null, 2));
+  next();
+});
+
 // CORS configuration must come before any other middleware
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
@@ -18,13 +25,13 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // Temporarily allow all origins while debugging
+    // Echo back the origin for credentialed requests
     log(`Origin ${origin} is allowed`);
     callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   exposedHeaders: ['Access-Control-Allow-Origin', 'Access-Control-Allow-Credentials'],
   maxAge: 86400 // 24 hours
 };
@@ -36,17 +43,32 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
 // Additional headers for security and CORS
 app.use((req, res, next) => {
+  // Log CORS-related headers
+  log('Setting response headers');
+
+  // Security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
-  // Ensure CORS headers are set
+
+  // CORS headers - explicitly set for each request
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  // If we have an origin, echo it back
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
   next();
 });
 
-// Logging middleware
+// Logging middleware for response status
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -60,17 +82,9 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
+    log(`${req.method} ${path} ${res.statusCode} in ${duration}ms`);
+    if (capturedJsonResponse) {
+      log('Response:', JSON.stringify(capturedJsonResponse));
     }
   });
 
@@ -79,6 +93,8 @@ app.use((req, res, next) => {
 
 const PORT = Number(process.env.PORT) || 5000;
 const HOST = '0.0.0.0';
+
+log(`Starting server on ${HOST}:${PORT}`);
 
 (async () => {
   // Setup auth first
@@ -91,7 +107,6 @@ const HOST = '0.0.0.0';
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
     log(`Error: ${status} - ${message}`);
     res.status(status).json({ message });
   });
@@ -104,7 +119,10 @@ const HOST = '0.0.0.0';
   }
 
   server.listen(PORT, HOST, () => {
-    log(`Server running on port ${PORT}`);
-    log(`Access your application at: ${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
+    log(`Server running at http://${HOST}:${PORT}`);
+    log(`Environment: ${app.get("env")}`);
+    if (process.env.REPL_SLUG && process.env.REPL_OWNER) {
+      log(`Access your application at: ${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
+    }
   });
 })();
