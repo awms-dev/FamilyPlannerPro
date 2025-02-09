@@ -135,7 +135,11 @@ export default function HomePage() {
         assignedTo: Number(data.assignedTo),
       };
 
-      await apiRequest("POST", "/api/activities", activityData);
+      const response = await apiRequest("POST", "/api/activities", activityData);
+      if (!response.ok) {
+        throw new Error('Failed to create activity');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/activities", { familyId: selectedFamilyId }] });
@@ -154,6 +158,14 @@ export default function HomePage() {
       });
     },
   });
+
+  const onSubmitActivity = async (data: ActivityFormData) => {
+    try {
+      await createActivityMutation.mutateAsync(data);
+    } catch (error) {
+      console.error('Activity creation error:', error);
+    }
+  };
 
   const completeActivityMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -282,7 +294,7 @@ export default function HomePage() {
                     <DialogHeader>
                       <DialogTitle>Create New Activity</DialogTitle>
                     </DialogHeader>
-                    <form onSubmit={activityForm.handleSubmit((data) => createActivityMutation.mutate(data))}>
+                    <form onSubmit={activityForm.handleSubmit(onSubmitActivity)}>
                       <div className="space-y-4">
                         <div>
                           <Label htmlFor="title">Title</Label>
