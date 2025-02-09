@@ -17,8 +17,21 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
 
+  const { data: families = [] } = useQuery({
+    queryKey: ["/api/families"],
+  });
+
+  const defaultFamilyId = families[0]?.id;
+
   const { data: activities = [] } = useQuery<Activity[]>({
-    queryKey: ["/api/activities"],
+    queryKey: ["/api/activities", defaultFamilyId],
+    queryFn: async () => {
+      if (!defaultFamilyId) return [];
+      const response = await fetch(`/api/activities?familyId=${defaultFamilyId}`);
+      if (!response.ok) throw new Error('Failed to fetch activities');
+      return response.json();
+    },
+    enabled: !!defaultFamilyId,
   });
 
   // Get dates that have activities
