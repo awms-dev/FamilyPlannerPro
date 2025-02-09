@@ -28,23 +28,20 @@ export class DatabaseStorage implements IStorage {
     this.sessionStore = sessionStore;
   }
 
-  // Optimize common queries with prepared statements
-  private async getUserQuery(condition: any) {
-    const [user] = await db
+  async getUser(id: number): Promise<User | undefined> {
+    const result = await db
       .select()
       .from(users)
-      .where(condition)
-      .prepare(); // Use prepare instead of $prepare
-
-    return user;
-  }
-
-  async getUser(id: number): Promise<User | undefined> {
-    return this.getUserQuery(eq(users.id, id));
+      .where(eq(users.id, id));
+    return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return this.getUserQuery(eq(users.username, username));
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
+    return result[0];
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -53,7 +50,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActivities(userId: number): Promise<Activity[]> {
-    // Optimize with cursor-based pagination and prepared statements
     return db
       .select()
       .from(activities)
@@ -63,8 +59,7 @@ export class DatabaseStorage implements IStorage {
           eq(activities.assignedTo, userId)
         )
       )
-      .limit(100) // Implement pagination
-      .prepare(); // Use prepare instead of $prepare
+      .limit(100); // Implement pagination for cost efficiency
   }
 
   async createActivity(activity: InsertActivity & { createdBy: number }): Promise<Activity> {

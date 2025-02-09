@@ -26,15 +26,3 @@ pool.on('error', (err) => {
 });
 
 export const db = drizzle({ client: pool, schema });
-
-// Only log queries in development
-if (process.env.NODE_ENV !== 'production') {
-  const queryLogging = (query: any) => {
-    console.log('Query:', query.query, 'Params:', query.params);
-  };
-
-  // Attach query logging if available
-  if (typeof db.on === 'function') {
-    db.on('query', queryLogging);
-  }
-}
