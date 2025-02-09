@@ -39,6 +39,7 @@ const categories = [
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
+  const [createFamilyDialogOpen, setCreateFamilyDialogOpen] = useState(false);
   const activityForm = useForm({
     resolver: zodResolver(insertActivitySchema),
     defaultValues: {
@@ -50,11 +51,11 @@ export default function HomePage() {
     resolver: zodResolver(insertFamilySchema),
   });
 
+  const [selectedFamilyId, setSelectedFamilyId] = useState<number | null>(null);
+
   const { data: families = [] } = useQuery<Family[]>({
     queryKey: ["/api/families"],
   });
-
-  const [selectedFamilyId, setSelectedFamilyId] = useState<number | null>(null);
 
   const { data: activities = [] } = useQuery<Activity[]>({
     queryKey: ["/api/activities", { familyId: selectedFamilyId }],
@@ -73,6 +74,7 @@ export default function HomePage() {
         description: "Family created successfully",
       });
       familyForm.reset();
+      setCreateFamilyDialogOpen(false); // Close dialog on success
     },
     onError: (error: Error) => {
       toast({
@@ -80,6 +82,7 @@ export default function HomePage() {
         description: error.message,
         variant: "destructive",
       });
+      // Dialog stays open on error
     },
   });
 
@@ -155,7 +158,7 @@ export default function HomePage() {
           <section>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">My Families</h2>
-              <Dialog>
+              <Dialog open={createFamilyDialogOpen} onOpenChange={setCreateFamilyDialogOpen}>
                 <DialogTrigger asChild>
                   <Button>
                     <Users className="mr-2 h-4 w-4" />
@@ -173,7 +176,7 @@ export default function HomePage() {
                         <Input id="name" {...familyForm.register("name")} />
                       </div>
                       <Button type="submit" className="w-full" disabled={createFamilyMutation.isPending}>
-                        Create Family
+                        {createFamilyMutation.isPending ? "Creating..." : "Create Family"}
                       </Button>
                     </div>
                   </form>
