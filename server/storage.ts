@@ -16,6 +16,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  sessionStore: session.Store;
 
   // Family related methods
   createFamily(family: InsertFamily & { createdBy: number }): Promise<Family>;
@@ -28,12 +29,10 @@ export interface IStorage {
   getFamilyMembersByEmail(email: string): Promise<FamilyMember[]>;
   updateFamilyMemberStatus(id: number, status: "pending" | "active"): Promise<FamilyMember>;
 
-  // Updated activity methods to include family context
+  // Activity methods
   getActivities(familyId: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity & { createdBy: number }): Promise<Activity>;
   completeActivity(id: number): Promise<Activity>;
-
-  sessionStore: session.Store;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -44,26 +43,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, id));
+    const result = await db.select().from(users).where(eq(users.id, id));
     return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.username, username));
+    const result = await db.select().from(users).where(eq(users.username, username));
     return result[0];
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email));
+    const result = await db.select().from(users).where(eq(users.email, email));
     return result[0];
   }
 

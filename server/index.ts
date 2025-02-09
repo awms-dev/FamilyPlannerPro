@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { setupAuth } from "./auth";
 
 const app = express();
 app.use(express.json());
@@ -46,6 +47,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Setup auth first
+  setupAuth(app);
+
+  // Then register routes
   const server = registerRoutes(app);
 
   // Error handling middleware
@@ -65,7 +70,7 @@ app.use((req, res, next) => {
   }
 
   // Use environment variables for port with fallback
-  const PORT = process.env.PORT || 5000;
+  const PORT = Number(process.env.PORT) || 5000;
   const HOST = '0.0.0.0';
 
   server.listen(PORT, HOST, () => {
