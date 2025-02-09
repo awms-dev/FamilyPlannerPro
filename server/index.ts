@@ -6,11 +6,7 @@ import cors from "cors";
 
 const app = express();
 
-// Basic middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-
-// CORS configuration
+// CORS configuration must come before any other middleware
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     // Log the incoming origin for debugging
@@ -22,29 +18,31 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // Allow all Replit domains and local development
-    if (origin.match(/https?:\/\/.*\.repl(it|\.dev|\.co)/) ||
-        origin.startsWith('http://localhost:') ||
-        origin.startsWith('http://127.0.0.1:')) {
-      log(`Origin ${origin} is allowed`);
-      callback(null, true);
-    } else {
-      log(`Origin ${origin} is not allowed`);
-      callback(new Error('Not allowed by CORS'));
-    }
+    // Temporarily allow all origins while debugging
+    log(`Origin ${origin} is allowed`);
+    callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Access-Control-Allow-Origin', 'Access-Control-Allow-Credentials'],
+  maxAge: 86400 // 24 hours
 };
 
+// Apply CORS middleware first
 app.use(cors(corsOptions));
 
-// Security headers
+// Then apply other middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// Additional headers for security and CORS
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  // Ensure CORS headers are set
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   next();
 });
 
@@ -79,6 +77,9 @@ app.use((req, res, next) => {
   next();
 });
 
+const PORT = Number(process.env.PORT) || 5000;
+const HOST = '0.0.0.0';
+
 (async () => {
   // Setup auth first
   setupAuth(app);
@@ -101,10 +102,6 @@ app.use((req, res, next) => {
   } else {
     serveStatic(app);
   }
-
-  // Use environment variables for port with fallback
-  const PORT = Number(process.env.PORT) || 5000;
-  const HOST = '0.0.0.0';
 
   server.listen(PORT, HOST, () => {
     log(`Server running on port ${PORT}`);

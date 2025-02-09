@@ -8,11 +8,9 @@ async function throwIfResNotOk(res: Response) {
 }
 
 // Determine the API base URL based on the environment
-const BASE_URL = import.meta.env.DEV 
-  ? `${window.location.protocol}//${window.location.hostname}:5000`
-  : window.location.origin;
+const BASE_URL = window.location.origin;
 
-console.log('API Base URL:', BASE_URL); // Add logging to verify the URL being used
+console.log('API Base URL:', BASE_URL); // Debug log
 
 export async function apiRequest(
   method: string,
@@ -20,11 +18,14 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const requestUrl = `${BASE_URL}${url}`;
-  console.log('Making API request to:', requestUrl); // Log the full request URL
+  console.log('Making API request to:', requestUrl); // Debug log for each request
 
   const res = await fetch(requestUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...(data ? { "Content-Type": "application/json" } : {}),
+      "Accept": "application/json",
+    },
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -39,8 +40,14 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(`${BASE_URL}${queryKey[0]}`, {
+    const requestUrl = `${BASE_URL}${queryKey[0]}`;
+    console.log('Making query request to:', requestUrl); // Debug log for queries
+
+    const res = await fetch(requestUrl, {
       credentials: "include",
+      headers: {
+        "Accept": "application/json",
+      },
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
