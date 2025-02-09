@@ -11,12 +11,23 @@ export function registerRoutes(app: Express): Server {
   // Family management routes
   app.post("/api/families", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const parsed = insertFamilySchema.parse(req.body);
-    const family = await storage.createFamily({
-      ...parsed,
-      createdBy: req.user.id,
-    });
-    res.status(201).json(family);
+
+    console.log('POST /api/families - Request body:', req.body);
+    try {
+      const parsed = insertFamilySchema.parse(req.body);
+      console.log('POST /api/families - Parsed data:', parsed);
+
+      const family = await storage.createFamily({
+        ...parsed,
+        createdBy: req.user.id,
+      });
+
+      console.log('POST /api/families - Created family:', family);
+      res.status(201).json(family);
+    } catch (error) {
+      console.error('POST /api/families - Error:', error);
+      res.status(400).json({ error: error.message });
+    }
   });
 
   app.get("/api/families", async (req, res) => {
@@ -38,7 +49,6 @@ export function registerRoutes(app: Express): Server {
     const { familyId } = z.object({ familyId: z.coerce.number() }).parse(req.params);
     const parsed = insertFamilyMemberSchema.parse(req.body);
 
-    // Check if the invited user already exists
     const existingUser = await storage.getUserByEmail(parsed.inviteEmail);
 
     const member = await storage.inviteFamilyMember({
