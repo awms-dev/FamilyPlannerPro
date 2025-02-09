@@ -24,35 +24,26 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
-  console.log('AuthProvider: Initializing');
-
   const {
     data: user,
     error,
     isLoading,
-  } = useQuery<SelectUser | undefined, Error>({
+  } = useQuery<SelectUser>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
-    onError: (error) => {
-      console.error('Auth query error:', error);
-      if (error.message !== '401: Unauthorized') {
-        toast({
-          title: "Authentication Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      }
-    },
+    retry: false
   });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       console.log('Login attempt for user:', credentials.username);
       const res = await apiRequest("POST", "/api/login", credentials);
-      return await res.json();
+      const data = await res.json();
+      console.log('Login response:', data);
+      return data;
     },
     onSuccess: (user: SelectUser) => {
-      console.log('Login successful for user:', user.username);
+      console.log('Login successful for user:', user);
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Success",
@@ -71,12 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
-      console.log('Registration attempt for user:', credentials.username);
+      console.log('Registration attempt with data:', credentials);
       const res = await apiRequest("POST", "/api/register", credentials);
-      return await res.json();
+      const data = await res.json();
+      console.log('Registration response:', data);
+      return data;
     },
     onSuccess: (user: SelectUser) => {
-      console.log('Registration successful for user:', user.username);
+      console.log('Registration successful for user:', user);
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Success",
