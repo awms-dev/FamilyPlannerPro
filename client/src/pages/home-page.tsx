@@ -15,16 +15,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertActivitySchema, type Activity } from "@shared/schema";
+import { insertActivitySchema, insertFamilySchema, type Activity, type Family } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { CalendarIcon, Plus, CheckCircle, CalendarDays } from "lucide-react";
+import { CalendarIcon, Plus, CheckCircle, CalendarDays, Users } from "lucide-react";
 import { Link } from "wouter";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { FamilyMembers } from "@/components/FamilyMembers";
+import { useState } from "react";
 
 const categories = [
   "Groceries",
@@ -37,24 +39,57 @@ const categories = [
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
-  const form = useForm({
+  const activityForm = useForm({
     resolver: zodResolver(insertActivitySchema),
     defaultValues: {
       isAllDay: false,
     },
   });
 
+  const familyForm = useForm({
+    resolver: zodResolver(insertFamilySchema),
+  });
+
+  const { data: families = [] } = useQuery<Family[]>({
+    queryKey: ["/api/families"],
+  });
+
+  const [selectedFamilyId, setSelectedFamilyId] = useState<number | null>(null);
+
   const { data: activities = [] } = useQuery<Activity[]>({
-    queryKey: ["/api/activities"],
+    queryKey: ["/api/activities", { familyId: selectedFamilyId }],
+    enabled: !!selectedFamilyId,
+  });
+
+  const createFamilyMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/families", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/families"] });
+      toast({
+        title: "Success",
+        description: "Family created successfully",
+      });
+      familyForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const createActivityMutation = useMutation({
     mutationFn: async (data: any) => {
       try {
-        // Form data already includes proper Date objects from the calendar
         await apiRequest("POST", "/api/activities", {
           ...data,
-          assignedTo: Number(data.assignedTo), // Ensure assignedTo is a number
+          familyId: selectedFamilyId,
+          assignedTo: Number(data.assignedTo),
         });
       } catch (error) {
         console.error("Failed to create activity:", error);
@@ -62,12 +97,12 @@ export default function HomePage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activities", { familyId: selectedFamilyId }] });
       toast({
         title: "Success",
         description: "Activity created successfully",
       });
-      form.reset();
+      activityForm.reset();
     },
     onError: (error: Error) => {
       toast({
@@ -83,7 +118,7 @@ export default function HomePage() {
       await apiRequest("PATCH", `/api/activities/${id}/complete`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activities", { familyId: selectedFamilyId }] });
     },
   });
 
@@ -115,158 +150,221 @@ export default function HomePage() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-xl font-semibold">Activities</h2>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Activity
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Create New Activity</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={form.handleSubmit((data) => createActivityMutation.mutate(data))}>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="title">Title</Label>
-                    <Input id="title" {...form.register("title")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea id="description" {...form.register("description")} />
-                  </div>
-                  <div>
-                    <Label>Category</Label>
-                    <Select onValueChange={(value) => form.setValue("category", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Start Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !form.watch("startDate") && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.watch("startDate") ? format(form.watch("startDate"), "PPP") : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={form.watch("startDate")}
-                          onSelect={(date) => form.setValue("startDate", date)}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div>
-                    <Label>End Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !form.watch("endDate") && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.watch("endDate") ? format(form.watch("endDate"), "PPP") : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={form.watch("endDate")}
-                          onSelect={(date) => form.setValue("endDate", date)}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label>All Day Event</Label>
-                    <Switch
-                      checked={form.watch("isAllDay")}
-                      onCheckedChange={(checked) => form.setValue("isAllDay", checked)}
-                    />
-                  </div>
-                  <div>
-                    <Label>Assign To</Label>
-                    <Select onValueChange={(value) => form.setValue("assignedTo", parseInt(value))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select family member" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={user!.id.toString()}>{user!.displayName}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={createActivityMutation.isPending}>
-                    Create Activity
+        <div className="grid gap-8">
+          {/* Family Section */}
+          <section>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">My Families</h2>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Users className="mr-2 h-4 w-4" />
+                    Create Family
                   </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Family</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={familyForm.handleSubmit((data) => createFamilyMutation.mutate(data))}>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="name">Family Name</Label>
+                        <Input id="name" {...familyForm.register("name")} />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={createFamilyMutation.isPending}>
+                        Create Family
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activities.map((activity) => (
-            <Card key={activity.id}>
-              <CardHeader>
-                <CardTitle className="flex justify-between items-center">
-                  <span>{activity.title}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => completeActivityMutation.mutate(activity.id)}
-                    disabled={activity.completed || false}
-                  >
-                    <CheckCircle className={cn("h-5 w-5", activity.completed ? "text-primary" : "text-muted-foreground")} />
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {activity.description && (
-                  <p className="text-sm text-muted-foreground mb-4">{activity.description}</p>
-                )}
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-primary font-medium">{activity.category}</span>
-                    {activity.isAllDay ? (
-                      <span className="text-muted-foreground">All day event</span>
-                    ) : null}
-                  </div>
-                  <div className="text-muted-foreground">
-                    <p>Starts: {format(new Date(activity.startDate), "PPp")}</p>
-                    {activity.endDate && (
-                      <p>Ends: {format(new Date(activity.endDate), "PPp")}</p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+              {families.map((family) => (
+                <Card
+                  key={family.id}
+                  className={cn(
+                    "cursor-pointer transition-colors",
+                    selectedFamilyId === family.id
+                      ? "border-primary"
+                      : "hover:border-primary/50"
+                  )}
+                  onClick={() => setSelectedFamilyId(family.id)}
+                >
+                  <CardHeader>
+                    <CardTitle>{family.name}</CardTitle>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+
+            {selectedFamilyId && (
+              <div className="mb-8">
+                <FamilyMembers familyId={selectedFamilyId} />
+              </div>
+            )}
+          </section>
+
+          {/* Activities Section */}
+          {selectedFamilyId && (
+            <section>
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-xl font-semibold">Activities</h2>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Activity
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Create New Activity</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={activityForm.handleSubmit((data) => createActivityMutation.mutate(data))}>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="title">Title</Label>
+                          <Input id="title" {...activityForm.register("title")} />
+                        </div>
+                        <div>
+                          <Label htmlFor="description">Description</Label>
+                          <Textarea id="description" {...activityForm.register("description")} />
+                        </div>
+                        <div>
+                          <Label>Category</Label>
+                          <Select onValueChange={(value) => activityForm.setValue("category", value)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((category) => (
+                                <SelectItem key={category} value={category}>
+                                  {category}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Start Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !activityForm.watch("startDate") && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {activityForm.watch("startDate") ? format(activityForm.watch("startDate"), "PPP") : <span>Pick a date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={activityForm.watch("startDate")}
+                                onSelect={(date) => activityForm.setValue("startDate", date)}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div>
+                          <Label>End Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !activityForm.watch("endDate") && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {activityForm.watch("endDate") ? format(activityForm.watch("endDate"), "PPP") : <span>Pick a date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={activityForm.watch("endDate")}
+                                onSelect={(date) => activityForm.setValue("endDate", date)}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label>All Day Event</Label>
+                          <Switch
+                            checked={activityForm.watch("isAllDay")}
+                            onCheckedChange={(checked) => activityForm.setValue("isAllDay", checked)}
+                          />
+                        </div>
+                        <div>
+                          <Label>Assign To</Label>
+                          <Select onValueChange={(value) => activityForm.setValue("assignedTo", parseInt(value))}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select family member" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={user!.id.toString()}>{user!.displayName}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button type="submit" className="w-full" disabled={createActivityMutation.isPending}>
+                          Create Activity
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {activities.map((activity) => (
+                  <Card key={activity.id}>
+                    <CardHeader>
+                      <CardTitle className="flex justify-between items-center">
+                        <span>{activity.title}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => completeActivityMutation.mutate(activity.id)}
+                          disabled={activity.completed || false}
+                        >
+                          <CheckCircle className={cn("h-5 w-5", activity.completed ? "text-primary" : "text-muted-foreground")} />
+                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {activity.description && (
+                        <p className="text-sm text-muted-foreground mb-4">{activity.description}</p>
+                      )}
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-primary font-medium">{activity.category}</span>
+                          {activity.isAllDay ? (
+                            <span className="text-muted-foreground">All day event</span>
+                          ) : null}
+                        </div>
+                        <div className="text-muted-foreground">
+                          <p>Starts: {format(new Date(activity.startDate), "PPp")}</p>
+                          {activity.endDate && (
+                            <p>Ends: {format(new Date(activity.endDate), "PPp")}</p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </main>
     </div>
