@@ -38,11 +38,17 @@ export const insertActivitySchema = createInsertSchema(activities)
     assignedTo: true,
     isAllDay: true,
   })
-  .transform((data) => ({
-    ...data,
-    startDate: new Date(data.startDate),
-    endDate: data.endDate ? new Date(data.endDate) : undefined,
-  }));
+  .transform((data) => {
+    // Ensure dates are properly transformed to Date objects
+    const startDate = data.startDate instanceof Date ? data.startDate : new Date(data.startDate);
+    const endDate = data.endDate ? (data.endDate instanceof Date ? data.endDate : new Date(data.endDate)) : undefined;
+
+    return {
+      ...data,
+      startDate,
+      endDate,
+    };
+  });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
