@@ -171,9 +171,18 @@ export default function HomePage() {
                   </DialogHeader>
                   <form onSubmit={(e) => {
                     e.preventDefault();
-                    familyForm.handleSubmit((data) => {
-                      createFamilyMutation.mutate(data);
-                    })(e);
+                    const handleSubmit = async () => {
+                      try {
+                        await familyForm.handleSubmit((data) => {
+                          console.log('Submitting family data:', data);
+                          return createFamilyMutation.mutateAsync(data);
+                        })(e);
+                      } catch (error) {
+                        console.error('Form submission error:', error);
+                        // Keep dialog open on error
+                      }
+                    };
+                    handleSubmit();
                   }}>
                     <div className="space-y-4">
                       <div>
