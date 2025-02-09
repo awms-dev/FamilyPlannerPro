@@ -10,6 +10,12 @@ function generateInviteToken(): string {
   return randomBytes(32).toString('hex');
 }
 
+function constructAppUrl(req: Express.Request): string {
+  const protocol = req.headers['x-forwarded-proto'] || 'http';
+  const host = req.headers.host || req.hostname;
+  return `${protocol}://${host}`;
+}
+
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
@@ -96,13 +102,11 @@ export function registerRoutes(app: Express): Server {
         status: existingUser ? "active" : "pending",
       });
 
-      // Get the app URL from request headers
-      const protocol = req.headers['x-forwarded-proto'] || 'http';
-      const host = req.headers.host || req.hostname;
-      const appUrl = `${protocol}://${host}`;
-      const inviteUrl = `${appUrl}/auth?invite=${inviteToken}`;
+      // Construct invite URL without double slashes
+      const baseUrl = constructAppUrl(req);
+      const inviteUrl = `${baseUrl}/auth?invite=${inviteToken}`;
 
-      console.log('Generated invite URL:', inviteUrl); // Add logging
+      console.log('Generated invite URL:', inviteUrl);
 
       res.status(201).json({
         ...member,
