@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
@@ -10,9 +10,9 @@ function generateInviteToken(): string {
   return randomBytes(32).toString('hex');
 }
 
-function constructAppUrl(req: Express.Request): string {
-  const protocol = req.headers['x-forwarded-proto'] || 'http';
-  const host = req.headers.host || req.hostname;
+function constructAppUrl(req: Request): string {
+  const protocol = (req.headers['x-forwarded-proto'] as string) || 'http';
+  const host = req.headers.host || 'localhost';
   const baseUrl = `${protocol}://${host}`;
   // Remove any trailing slashes
   return baseUrl.replace(/\/+$/, '');
