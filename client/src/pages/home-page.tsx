@@ -25,7 +25,6 @@ import { CalendarIcon, Plus, CheckCircle, CalendarDays } from "lucide-react";
 import { Link } from "wouter";
 import { Switch } from "@/components/ui/switch";
 
-
 const categories = [
   "Groceries",
   "Sports",
@@ -38,6 +37,9 @@ export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const form = useForm({
     resolver: zodResolver(insertActivitySchema),
+    defaultValues: {
+      isAllDay: false,
+    },
   });
 
   const { data: activities = [] } = useQuery<Activity[]>({
@@ -99,7 +101,7 @@ export default function HomePage() {
                 Add Activity
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>Create New Activity</DialogTitle>
               </DialogHeader>
@@ -140,14 +142,15 @@ export default function HomePage() {
                           )}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.watch("startDate") ? format(form.watch("startDate"), "PPP") : <span>Pick a date</span>}
+                          {form.watch("startDate") ? format(new Date(form.watch("startDate")), "PPP") : <span>Pick a date</span>}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
+                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
-                          selected={form.watch("startDate")}
+                          selected={form.watch("startDate") ? new Date(form.watch("startDate")) : undefined}
                           onSelect={(date) => form.setValue("startDate", date)}
+                          initialFocus
                         />
                       </PopoverContent>
                     </Popover>
@@ -164,19 +167,20 @@ export default function HomePage() {
                           )}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.watch("endDate") ? format(form.watch("endDate"), "PPP") : <span>Pick a date</span>}
+                          {form.watch("endDate") ? format(new Date(form.watch("endDate")), "PPP") : <span>Pick a date</span>}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
+                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
-                          selected={form.watch("endDate")}
+                          selected={form.watch("endDate") ? new Date(form.watch("endDate")) : undefined}
                           onSelect={(date) => form.setValue("endDate", date)}
+                          initialFocus
                         />
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <div>
+                  <div className="flex items-center gap-2">
                     <Label>All Day Event</Label>
                     <Switch 
                       checked={form.watch("isAllDay")}
@@ -213,21 +217,29 @@ export default function HomePage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => completeActivityMutation.mutate(activity.id)}
-                    disabled={activity.completed}
+                    disabled={activity.completed || false}
                   >
                     <CheckCircle className={cn("h-5 w-5", activity.completed ? "text-primary" : "text-muted-foreground")} />
                   </Button>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground mb-2">{activity.description}</p>
-                <div className="flex justify-between text-sm">
-                  <span className="text-primary">{activity.category}</span>
-                  {activity.dueDate && (
-                    <span className="text-muted-foreground">
-                      Due: {format(new Date(activity.dueDate), "PP")}
-                    </span>
-                  )}
+                {activity.description && (
+                  <p className="text-sm text-muted-foreground mb-4">{activity.description}</p>
+                )}
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-primary font-medium">{activity.category}</span>
+                    {activity.isAllDay ? (
+                      <span className="text-muted-foreground">All day event</span>
+                    ) : null}
+                  </div>
+                  <div className="text-muted-foreground">
+                    <p>Starts: {format(new Date(activity.startDate), "PPp")}</p>
+                    {activity.endDate && (
+                      <p>Ends: {format(new Date(activity.endDate), "PPp")}</p>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
