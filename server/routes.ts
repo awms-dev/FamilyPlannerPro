@@ -96,11 +96,13 @@ export function registerRoutes(app: Express): Server {
         status: existingUser ? "active" : "pending",
       });
 
-      // Generate invite URL
-      const appUrl = process.env.REPL_SLUG
-        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-        : 'http://localhost:3000';
+      // Get the app URL from request headers
+      const protocol = req.headers['x-forwarded-proto'] || 'http';
+      const host = req.headers.host || req.hostname;
+      const appUrl = `${protocol}://${host}`;
       const inviteUrl = `${appUrl}/auth?invite=${inviteToken}`;
+
+      console.log('Generated invite URL:', inviteUrl); // Add logging
 
       res.status(201).json({
         ...member,
