@@ -37,7 +37,7 @@ const categories = [
   "Other"
 ];
 
-// Add activity form schema
+// Add activity form schema with proper validation
 const activityFormSchema = insertActivitySchema.extend({
   startTime: z.string(),
   endTime: z.string().optional(),
@@ -130,14 +130,15 @@ export default function HomePage() {
       const activityData = {
         ...data,
         familyId: selectedFamilyId,
-        startDate: startDateTime,
-        endDate: endDateTime,
+        startDate: startDateTime.toISOString(),
+        endDate: endDateTime?.toISOString(),
         assignedTo: Number(data.assignedTo),
       };
 
       const response = await apiRequest("POST", "/api/activities", activityData);
       if (!response.ok) {
-        throw new Error('Failed to create activity');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create activity');
       }
       return response.json();
     },
@@ -160,6 +161,15 @@ export default function HomePage() {
   });
 
   const onSubmitActivity = async (data: ActivityFormData) => {
+    if (!selectedFamilyId) {
+      toast({
+        title: "Error",
+        description: "Please select a family first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       await createActivityMutation.mutateAsync(data);
     } catch (error) {
