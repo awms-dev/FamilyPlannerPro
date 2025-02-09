@@ -11,10 +11,14 @@ app.use(express.urlencoded({ extended: false }));
 
 // CORS headers for Replit environment
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  const origin = req.get('origin');
+  // Allow the specific Replit domain
+  if (origin && (origin.endsWith('.repl.co') || origin.endsWith('.replit.dev'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
 
   // Security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
