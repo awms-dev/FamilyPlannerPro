@@ -7,15 +7,22 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// Use current origin for API calls to ensure it works with any Replit domain
-const BASE_URL = window.location.origin;
+// Determine the API base URL based on the environment
+const BASE_URL = import.meta.env.DEV 
+  ? `${window.location.protocol}//${window.location.hostname}:5000`
+  : window.location.origin;
+
+console.log('API Base URL:', BASE_URL); // Add logging to verify the URL being used
 
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(`${BASE_URL}${url}`, {
+  const requestUrl = `${BASE_URL}${url}`;
+  console.log('Making API request to:', requestUrl); // Log the full request URL
+
+  const res = await fetch(requestUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,

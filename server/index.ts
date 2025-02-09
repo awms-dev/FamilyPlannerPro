@@ -13,20 +13,23 @@ app.use(express.urlencoded({ extended: false }));
 // CORS configuration
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    // Log the incoming origin for debugging
+    log(`Incoming request origin: ${origin}`);
 
-    // Allow requests from Replit domains
-    if (
-      origin.endsWith('.repl.co') || 
-      origin.endsWith('.replit.dev') ||
-      origin.includes('.repl.co') ||
-      origin.includes('.replit.dev') ||
-      origin.startsWith('http://localhost:') ||
-      origin.startsWith('http://127.0.0.1:')
-    ) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      log('No origin in request, allowing');
+      return callback(null, true);
+    }
+
+    // Allow all Replit domains and local development
+    if (origin.match(/https?:\/\/.*\.repl(it|\.dev|\.co)/) ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:')) {
+      log(`Origin ${origin} is allowed`);
       callback(null, true);
     } else {
+      log(`Origin ${origin} is not allowed`);
       callback(new Error('Not allowed by CORS'));
     }
   },
