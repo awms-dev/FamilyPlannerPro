@@ -23,10 +23,10 @@ export interface IStorage {
   getFamiliesByUserId(userId: number): Promise<Family[]>;
 
   // Family member related methods
-  inviteFamilyMember(member: InsertFamilyMember & { familyId: number }): Promise<FamilyMember>;
+  inviteFamilyMember(member: InsertFamilyMember & { familyId: number; userId?: number; status: "pending" | "active" }): Promise<FamilyMember>;
   getFamilyMembers(familyId: number): Promise<FamilyMember[]>;
   getFamilyMembersByEmail(email: string): Promise<FamilyMember[]>;
-  updateFamilyMemberStatus(id: number, status: string): Promise<FamilyMember>;
+  updateFamilyMemberStatus(id: number, status: "pending" | "active"): Promise<FamilyMember>;
 
   // Updated activity methods to include family context
   getActivities(familyId: number): Promise<Activity[]>;
@@ -77,11 +77,13 @@ export class DatabaseStorage implements IStorage {
 
     // Make the creator an admin member
     const user = await this.getUser(family.createdBy);
+    if (!user) throw new Error("User not found");
+
     await this.inviteFamilyMember({
       familyId: newFamily.id,
-      inviteEmail: user!.email,
+      userId: user.id,
+      inviteEmail: user.email,
       role: "admin",
-      userId: user!.id,
       status: "active"
     });
 
@@ -114,7 +116,7 @@ export class DatabaseStorage implements IStorage {
       .where(or(...familyIds.map(id => eq(families.id, id))));
   }
 
-  async inviteFamilyMember(member: InsertFamilyMember & { familyId: number, userId?: number }): Promise<FamilyMember> {
+  async inviteFamilyMember(member: InsertFamilyMember & { familyId: number; userId?: number; status: "pending" | "active" }): Promise<FamilyMember> {
     const [newMember] = await db.insert(familyMembers).values(member).returning();
     return newMember;
   }
@@ -133,7 +135,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(familyMembers.inviteEmail, email));
   }
 
-  async updateFamilyMemberStatus(id: number, status: string): Promise<FamilyMember> {
+  async updateFamilyMemberStatus(id: number, status: "pending" | "active"): Promise<FamilyMember> {
     const [member] = await db
       .update(familyMembers)
       .set({ status })
