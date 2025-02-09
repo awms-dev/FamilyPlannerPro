@@ -68,39 +68,52 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/families/:familyId/members", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    const { familyId } = z.object({ familyId: z.coerce.number() }).parse(req.params);
-    const parsed = insertFamilyMemberSchema.omit({ inviteToken: true }).parse(req.body);
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
 
-    // Check if member already exists
-    const existingMembers = await storage.getFamilyMembers(familyId);
-    const memberExists = existingMembers.some(member => member.inviteEmail === parsed.inviteEmail);
+      const { familyId } = z.object({ familyId: z.coerce.number() }).parse(req.params);
+      const { inviteEmail } = z.object({ inviteEmail: z.string().email() }).parse(req.body);
 
-    if (memberExists) {
-      return res.status(400).json({ error: "Member already exists in this family" });
+      // Check if member already exists
+      const existingMembers = await storage.getFamilyMembers(familyId);
+      const memberExists = existingMembers.some(member => member.inviteEmail === inviteEmail);
+
+      if (memberExists) {
+        return res.status(400).json({ error: "Member already exists in this family" });
+      }
+
+      const inviteToken = generateInviteToken();
+      const existingUser = await storage.getUserByEmail(inviteEmail);
+
+      const member = await storage.inviteFamilyMember({
+        inviteEmail,
+        inviteToken,
+        role: "member",
+        familyId,
+        userId: existingUser?.id,
+        status: existingUser ? "active" : "pending",
+      });
+
+      // Generate invite URL
+      const appUrl = process.env.REPL_SLUG
+        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+        : 'http://localhost:3000';
+      const inviteUrl = `${appUrl}/auth?invite=${inviteToken}`;
+
+      res.status(201).json({
+        ...member,
+        inviteUrl
+      });
+    } catch (error) {
+      console.error('Error creating family member:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'Failed to create family member' });
+      }
     }
-
-    const inviteToken = generateInviteToken();
-    const existingUser = await storage.getUserByEmail(parsed.inviteEmail);
-
-    const member = await storage.inviteFamilyMember({
-      ...parsed,
-      inviteToken,
-      familyId,
-      userId: existingUser?.id,
-      status: existingUser ? "active" : "pending",
-    });
-
-    // Generate invite URL
-    const appUrl = process.env.REPL_SLUG
-      ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-      : 'http://localhost:3000';
-    const inviteUrl = `${appUrl}/auth?invite=${inviteToken}`;
-
-    res.status(201).json({
-      ...member,
-      inviteUrl
-    });
   });
 
   // Add this route before the activities routes

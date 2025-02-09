@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { FamilyMember, InsertFamilyMember } from "@shared/schema";
-import { Loader2, UserPlus, X, Copy, CheckCircle } from "lucide-react";
+import { FamilyMember } from "@shared/schema";
+import { Loader2, UserPlus, Copy, CheckCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,16 +28,22 @@ export function FamilyMembers({ familyId }: { familyId: number }) {
 
   const inviteMutation = useMutation({
     mutationFn: async (data: { inviteEmail: string }) => {
-      const res = await apiRequest(
-        "POST",
-        `/api/families/${familyId}/members`,
-        { ...data, role: "member" } as InsertFamilyMember
-      );
-      const result = await res.json();
-      if (res.ok) {
-        return result;
-      } else {
-        throw new Error(result.error || "Failed to send invitation");
+      try {
+        const res = await apiRequest(
+          "POST",
+          `/api/families/${familyId}/members`,
+          data
+        );
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.error || "Failed to send invitation");
+        }
+        return res.json();
+      } catch (error) {
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error("Failed to send invitation");
       }
     },
     onSuccess: (data) => {
